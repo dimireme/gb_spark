@@ -1,4 +1,53 @@
+## Урок 4. Машинное обучение на pySpark на примере линейной регрессии
 
+#### Задание
+
+1. Построить распределение статей в датасете по `rating` с `bin_size = 10`.
+2. Написать функцию `ratingToClass(rating: Int): String`, которая определяет категорию статьи (A, B, C, D) на основе рейтинга. Границы для классов подобрать самостоятельно.
+3. Добавить к датасету категориальную фичу `rating_class`. При добавлении колонки использовать `udf` из функции в предыдущем пункте.
+4. Построить модель логистической регрессии (one vs all) для классификации статей по рассчитанным классам.
+5. Получить `F1 score` для получившейся модели
+
+#### Решение
+
+Пункт 1 выполнил [в тетрадке в цепелине](http://185.241.193.174:9995/#/notebook/2FUFZ2PAD). Тут приведу скрины некоторых этапов. Остальной код запускал в консольном спарке (па)
+
+###### Распределение рейтинга в датасете
+
+![Распределение рейтинга в датасете](/lesson_4/images/distribution_by_rating.png)
+
+###### Разбиение рейтинга на классы
+
+![Разбиение рейтинга на классы](/lesson_4/images/rating_to_classes.png)
+
+По второму пункту оказалось, что модели коассификации (логистическая регрессия, решающее дерево и случайный лес) принимают на вход `labelCol` число вместо строки, поэтому классы выбрал `1`, `2`, `3` и `4`. 
+
+После применения метода `ratingToClass` к исходному датафрейму, получил примерно одинаковое распределение стетей по классам рейтинга. Далее решал задачу классификации на основании текста в первых и последних пяти предложениях. Эти два столбца склеил в столбец `sentences`.
+ 
+Все 
+
+Генерацию столбцов `rating_class` и `sentences` будем производить в кастомном тирансформере `ColumnSelector`. 
+
+```python
+from pyspark.ml import Transformer
+from pyspark.sql.functions import concat, col, lit
+
+class ColumnSelector(Transformer):
+    def __init__(self):
+        super(ColumnSelector, self).__init__()
+    def _transform(self, df):
+        df = df \
+            .withColumn('rating', col('rating').cast(IntegerType())) \
+            .dropna(subset=('rating', 'first_5_sentences', 'last_5_sentences')) \
+            .withColumn('rating_class', ratingToClassUdf(col("rating")).cast(IntegerType())) \
+            .withColumn('sentences', concat(
+                col('first_5_sentences'),
+                lit(' '),
+                col('last_5_sentences')
+            )) \
+            .select('link', 'rating', 'rating_class', 'sentences')
+        return df
+```
 
 
     +------+------------+----------+                                                
